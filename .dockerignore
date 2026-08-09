@@ -1,0 +1,24 @@
+# Python
+**/__pycache__/
+**/*.pyc
+**/.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/build/
+**/*.tsbuildinfo
+
+# Runtime data
+data/uploads/
+data/processed/
+data/evaluation/
+
+# Secrets
+**/.env
+
+# IDE
+**/.vscode/
+**/.idea/

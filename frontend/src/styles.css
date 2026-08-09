@@ -1,0 +1,131 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin-top: 0.5rem;
+  color: #6b7280;
+}
+
+.card {
+  margin-top: 2.5rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border-radius: 0.375rem;
+  border: 1px solid #9ca3af;
+  cursor: pointer;
+  background: #111827;
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.session-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.session-meta dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+
+.session-meta dd {
+  margin: 0.1rem 0 0;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.doc-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.status-chip {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-weight: 600;
+}
+
+.error {
+  color: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .card {
+    border-color: #374151;
+    background: #111827;
+  }
+  .tagline,
+  .muted,
+  .session-meta dt {
+    color: #9ca3af;
+  }
+  .doc-list li {
+    border-color: #1f2937;
+  }
+  button {
+    border-color: #4b5563;
+  }
+}

@@ -1,0 +1,41 @@
+# Environment / secrets
+.env
+*.env
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime data (never commit session-scoped uploads or processed artifacts)
+data/uploads/*
+!data/uploads/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/evaluation/*
+!data/evaluation/.gitkeep
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

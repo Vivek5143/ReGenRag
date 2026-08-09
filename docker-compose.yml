@@ -1,0 +1,52 @@
+# ReGenRAG — Docker Compose (development foundation)
+
+# Phase 0: brings up the frontend and backend alongside a PostgreSQL instance
+# prepared for pgvector. No RAG pipeline services yet.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      - APP_NAME=ReGenRAG
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+psycopg://regenrag:regenrag@postgres:5432/regenrag
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./data/uploads:/data/uploads
+      - ./data/processed:/data/processed
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: regenrag
+      POSTGRES_PASSWORD: regenrag
+      POSTGRES_DB: regenrag
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # pgvector is applied via the image's init scripts when the extension is
+    # introduced in a later phase.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U regenrag -d regenrag"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

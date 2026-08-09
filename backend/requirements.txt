@@ -1,0 +1,18 @@
+# ReGenRAG backend dependencies.
+# Phase 1: adds PostgreSQL, Alembic, multipart uploads, and pgvector schema
+# support. RAG/runtime dependencies (langchain, langgraph, sentence-transformers,
+# an LLM client) remain for the later phases that implement those pipelines.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.10
+alembic==1.14.0
+python-multipart==0.0.20
+pgvector==0.3.6
+
+# Testing
+pytest==8.3.4
+httpx==0.28.1
