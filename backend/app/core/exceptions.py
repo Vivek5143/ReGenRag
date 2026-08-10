@@ -19,3 +19,7 @@ class DocumentNotFoundError(ReGenRAGError):
 
 class DocumentValidationError(ReGenRAGError):
     """An upload failed validation (type, size, path)."""
+
+
+class DocumentProcessingError(ReGenRAGError):
+    """PDF parsing, chunking, embedding, or persistence failed during ingestion."""

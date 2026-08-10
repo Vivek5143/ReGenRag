@@ -1,1 +1,1 @@
-"""Document ingestion pipeline (placeholders for a future phase)."""
+"""Document ingestion pipeline: PDF load -> clean -> chunk -> embed."""

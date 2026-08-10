@@ -39,12 +39,17 @@ class SessionResponse(BaseModel):
 
 
 class DocumentResponse(BaseModel):
-    """Document metadata (never includes the internal storage path)."""
+    """Document metadata (never includes the internal storage path).
+
+    ``chunk_count`` reports how many chunks were stored by ingestion
+    (0 for an unprocessed or failed document).
+    """
 
     document_id: uuid.UUID
     session_id: uuid.UUID
     filename: str
     status: DocumentStatus
     file_size: int
+    chunk_count: int
     created_at: datetime
     processed_at: datetime | None

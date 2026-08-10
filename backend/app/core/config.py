@@ -49,12 +49,25 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
 
     # --- Embeddings ---------------------------------------------------------
-    embedding_model: str = ""
-    # Embedding dimension for the pgvector column. Chosen to match the common
-    # sentence-transformers size (384). It must be aligned with whichever
-    # embedding model is selected in a later phase; changing it requires a new
-    # migration. No embeddings are generated or stored in Phase 1.
+    # Local sentence-transformers model run on-device (no API key, no external
+    # calls). all-MiniLM-L6-v2 emits 384-dim vectors, matching the pgvector
+    # column (EMBEDDING_DIMENSION).
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Embedding dimension for the pgvector column. Must match the actual output
+    # dimension of EMBEDDING_MODEL; the embedder verifies this at load time and
+    # refuses to run on a mismatch. Changing it requires a new migration.
     embedding_dimension: int = 384
+    # Batch size used by the embedder so many chunks are encoded in one call.
+    embedding_batch_size: int = 32
+    # Seed applied at model load so embeddings are deterministic for the same
+    # input.
+    embedding_seed: int = 42
+
+    # --- Chunking -----------------------------------------------------------
+    # Character-based chunk window and overlap between consecutive chunks.
+    # CHUNK_OVERLAP must be non-negative and strictly smaller than CHUNK_SIZE.
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
 
     # --- Storage ------------------------------------------------------------
     upload_dir: Path = _PROJECT_ROOT / "data" / "uploads"
@@ -78,6 +91,17 @@ class Settings(BaseSettings):
             self.upload_dir = (_PROJECT_ROOT / self.upload_dir).resolve()
         if not self.processed_dir.is_absolute():
             self.processed_dir = (_PROJECT_ROOT / self.processed_dir).resolve()
+        return self
+
+    @model_validator(mode="after")
+    def _validate_chunking(self) -> "Settings":
+        """Guard against invalid chunk window combinations."""
+        if self.chunk_size <= 0:
+            raise ValueError("CHUNK_SIZE must be a positive integer")
+        if not (0 <= self.chunk_overlap < self.chunk_size):
+            raise ValueError(
+                "CHUNK_OVERLAP must be >= 0 and strictly smaller than CHUNK_SIZE"
+            )
         return self
 
 

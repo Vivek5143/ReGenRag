@@ -1,7 +1,7 @@
 # ReGenRAG backend dependencies.
-# Phase 1: adds PostgreSQL, Alembic, multipart uploads, and pgvector schema
-# support. RAG/runtime dependencies (langchain, langgraph, sentence-transformers,
-# an LLM client) remain for the later phases that implement those pipelines.
+# Phase 2: adds PDF text extraction (pypdf) and local embeddings
+# (sentence-transformers; torch is pulled in as a dependency). RAG/runtime
+# dependencies (langchain, langgraph, an LLM client) remain for later phases.
 
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
@@ -13,6 +13,13 @@ alembic==1.14.0
 python-multipart==0.0.20
 pgvector==0.3.6
 
+# PDF text extraction (lightweight, pure-Python, text-based PDFs).
+pypdf==5.1.0
+# Local on-device embeddings. Installs torch as a transitive dependency.
+sentence-transformers==3.3.1
+
 # Testing
 pytest==8.3.4
 httpx==0.28.1
+# Generates real PDF fixtures for loader/ingestion tests (test-only).
+reportlab==4.2.5

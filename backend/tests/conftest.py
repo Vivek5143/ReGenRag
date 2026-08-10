@@ -88,6 +88,25 @@ def _clean_tables(engine):
             conn.execute(table.delete())
 
 
+@pytest.fixture(autouse=True)
+def _fake_embedding_model():
+    """Serve a fake local embedding model so tests never download a real one."""
+    from app.ingestion import embedder
+
+    class FakeModel:
+        def get_sentence_embedding_dimension(self):
+            return 384
+
+        def encode(self, texts, **kwargs):
+            import numpy as np
+
+            return np.zeros((len(texts), 384), dtype=float)
+
+    embedder._model = FakeModel()
+    yield
+    embedder._model = None
+
+
 @pytest.fixture()
 def client(engine, tmp_path, monkeypatch):
     """TestClient with get_db overridden to the test DB and storage in tmp."""

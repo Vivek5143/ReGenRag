@@ -1,13 +1,21 @@
 """End-to-end API tests for the session + document lifecycle.
 
 Run against the isolated test database via the client fixture (get_db is
-overridden to the test DB; uploads land in a temp dir). No LLM, no network.
+overridden to the test DB; uploads land in a temp dir). A fake embedding model
+is installed globally in conftest, so ingestion runs end-to-end with no
+network, no model downloads, and no LLM.
 """
 
-PDF_BYTES = b"%PDF-1.4 fake pdf for endpoint testing"
+from tests.factories import pdf_bytes
+
+# A real, parseable text PDF. Multiple pages so page handling is exercised.
+REAL_PDF = pdf_bytes(
+    "First page of the report body.",
+    "Second page with more evidence.",
+)
 
 
-def _upload_pdf(name="report.pdf", content=PDF_BYTES, content_type="application/pdf"):
+def _upload_pdf(name="report.pdf", content=REAL_PDF, content_type="application/pdf"):
     return {"file": (name, content, content_type)}
 
 
@@ -48,24 +56,40 @@ def test_upload_document_endpoint(client):
     body = response.json()
     assert body["session_id"] == session_id
     assert body["filename"] == "report.pdf"
-    assert body["status"] == "UPLOADED"
+    assert body["status"] == "PROCESSED"
+    assert body["chunk_count"] >= 1
     # Internal physical storage path must never be exposed to the client.
     assert "storage_path" not in body
 
 
+def test_upload_malformed_pdf_marks_failed(client):
+    session_id = client.post("/api/v1/sessions").json()["session_id"]
+
+    response = client.post(
+        f"/api/v1/sessions/{session_id}/documents",
+        files=_upload_pdf(content=b"%PDF-1.4 fake bytes"),
+    )
+
+    # Ingestion failed: the endpoint reports an error and the document is kept
+    # in FAILED state so the client can inspect it.
+    assert response.status_code == 500
+    docs = client.get(f"/api/v1/sessions/{session_id}/documents").json()
+    assert len(docs) == 1
+    assert docs[0]["status"] == "FAILED"
+
+
 def test_list_documents_endpoint(client):
     session_id = client.post("/api/v1/sessions").json()["session_id"]
-    client.post(
-        f"/api/v1/sessions/{session_id}/documents",
-        files={"file": ("a.pdf", PDF_BYTES, "application/pdf")},
-    )
+    client.post(f"/api/v1/sessions/{session_id}/documents", files=_upload_pdf())
 
     response = client.get(f"/api/v1/sessions/{session_id}/documents")
 
     assert response.status_code == 200
     docs = response.json()
     assert len(docs) == 1
-    assert docs[0]["filename"] == "a.pdf"
+    assert docs[0]["filename"] == "report.pdf"
+    assert docs[0]["status"] == "PROCESSED"
+    assert docs[0]["chunk_count"] >= 1
     assert "storage_path" not in docs[0]
 
 
@@ -111,7 +135,7 @@ def test_close_session_endpoint_cleans_up(client):
     session_id = created["session_id"]
     client.post(
         f"/api/v1/sessions/{session_id}/documents",
-        files={"file": ("a.pdf", PDF_BYTES, "application/pdf")},
+        files=_upload_pdf(),
     )
 
     response = client.delete(f"/api/v1/sessions/{session_id}")

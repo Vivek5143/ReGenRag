@@ -50,8 +50,8 @@ See the root [README](../README.md#local-setup) for full instructions.
 | Phase | Scope |
 | ----- | ----- |
 | **Phase 0** | Project foundation: app shell, config, DB foundation, health endpoint, placeholder modules, minimal UI, Docker. **No RAG pipeline.** ✅ |
-| **Phase 1 (current)** | Database & temporary session infrastructure: PostgreSQL engine, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, idempotent cleanup, minimal UI. **No RAG pipeline.** |
-| Phase 2 | Ingestion: PDF loading, chunking, embeddings, pgvector storage. |
+| **Phase 1** | Database & temporary session infrastructure: PostgreSQL engine, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, idempotent cleanup, minimal UI. **No RAG pipeline.** ✅ |
+| **Phase 2 (current)** | Ingestion: PDF loading (pypdf), text cleaning, chunking, local embeddings (sentence-transformers), pgvector storage. |
 | Phase 3 | Retrieval + generation: vector search, grounded answer generation, refusal on insufficient evidence. |
 | Phase 4 | Self-healing loop: LangGraph workflow, query rewriting, retrieval grading, answer criticism, retries. |
 | Phase 5 | Evaluation: retrieval/answer metrics, offline evaluation harness. |
@@ -64,6 +64,8 @@ See the root [README](../README.md#local-setup) for full instructions.
 - Migrations live in `backend/alembic/` and are driven by the application's own
   settings and metadata (`alembic/env.py`). Run `alembic upgrade head` from the
   `backend/` directory.
-- The `document_chunks.embedding` column (pgvector) is schema-only for now. When
-  an embedding model is selected, confirm its dimension matches
-  `EMBEDDING_DIMENSION` (a change requires a new migration).
+- The `document_chunks.embedding` column (pgvector) is `Vector(384)`, matching
+  the default embedding model `sentence-transformers/all-MiniLM-L6-v2` (384-dim).
+  The embedder verifies the model's real output dimension against
+  `EMBEDDING_DIMENSION` at load time and refuses to run on a mismatch. Changing
+  either requires a new migration.
