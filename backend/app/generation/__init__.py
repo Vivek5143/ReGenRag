@@ -1,1 +1,1 @@
-"""Answer generation (placeholders for a future phase)."""
+"""Generation layer: LLM provider boundary + baseline grounded answers."""

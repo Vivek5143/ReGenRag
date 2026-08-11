@@ -17,9 +17,10 @@ pgvector==0.3.6
 pypdf==5.1.0
 # Local on-device embeddings. Installs torch as a transitive dependency.
 sentence-transformers==3.3.1
+# HTTP client for the LLM provider boundary (no SDK dependency).
+httpx==0.28.1
 
 # Testing
 pytest==8.3.4
-httpx==0.28.1
 # Generates real PDF fixtures for loader/ingestion tests (test-only).
 reportlab==4.2.5

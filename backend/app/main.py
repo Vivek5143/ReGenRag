@@ -3,8 +3,8 @@
 The application is assembled here and routers are mounted. Endpoints live in
 their route modules; this file only wires them together.
 
-Phase 1: database + temporary document session infrastructure. The RAG pipeline
-(ingestion, retrieval, generation) is still not wired in.
+Phase 3 wires in the baseline RAG query endpoint (retrieval + generation) on
+top of the Phase 2 ingestion pipeline.
 """
 
 from fastapi import FastAPI
@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
     """Application factory used by uvicorn, tests, and ASGI servers."""
     app = FastAPI(
         title=settings.app_name,
-        version="0.2.0",
+        version="0.3.0",
         description="Self-healing RAG for evidence-grounded document intelligence.",
     )
 

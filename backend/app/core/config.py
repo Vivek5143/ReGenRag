@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     llm_provider: str = ""
     llm_model: str = ""
     llm_api_key: str = ""
+    # Base URL for OpenAI-compatible endpoints (``openai``/``ollama``). Leave
+    # empty to use the provider's default (OpenAI) or localhost (Ollama).
+    llm_base_url: str = ""
+    # Cap on tokens in a generated answer.
+    llm_max_tokens: int = 512
 
     # --- Embeddings ---------------------------------------------------------
     # Local sentence-transformers model run on-device (no API key, no external

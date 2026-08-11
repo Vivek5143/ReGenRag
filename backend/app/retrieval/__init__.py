@@ -1,1 +1,1 @@
-"""Retrieval layer (placeholders for a future phase)."""
+"""Retrieval layer: pgvector similarity search + LLM context building."""

@@ -51,8 +51,8 @@ See the root [README](../README.md#local-setup) for full instructions.
 | ----- | ----- |
 | **Phase 0** | Project foundation: app shell, config, DB foundation, health endpoint, placeholder modules, minimal UI, Docker. **No RAG pipeline.** ✅ |
 | **Phase 1** | Database & temporary session infrastructure: PostgreSQL engine, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, idempotent cleanup, minimal UI. **No RAG pipeline.** ✅ |
-| **Phase 2 (current)** | Ingestion: PDF loading (pypdf), text cleaning, chunking, local embeddings (sentence-transformers), pgvector storage. |
-| Phase 3 | Retrieval + generation: vector search, grounded answer generation, refusal on insufficient evidence. |
+| **Phase 2** | Ingestion: PDF loading (pypdf), text cleaning, chunking, local embeddings (sentence-transformers), pgvector storage. ✅ |
+| **Phase 3 (current)** | Retrieval + generation: vector search, grounded answer generation, refusal on insufficient evidence. |
 | Phase 4 | Self-healing loop: LangGraph workflow, query rewriting, retrieval grading, answer criticism, retries. |
 | Phase 5 | Evaluation: retrieval/answer metrics, offline evaluation harness. |
 | Phase 6 | Frontend: chat UI, self-healing trace, sources/evidence view. |

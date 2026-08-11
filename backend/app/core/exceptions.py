@@ -23,3 +23,19 @@ class DocumentValidationError(ReGenRAGError):
 
 class DocumentProcessingError(ReGenRAGError):
     """PDF parsing, chunking, embedding, or persistence failed during ingestion."""
+
+
+class NoProcessedDocumentError(ReGenRAGError):
+    """A session has no processed document to query against."""
+
+
+class RetrievalError(ReGenRAGError):
+    """Vector similarity retrieval failed (embedding, database, or search)."""
+
+
+class LLMConfigError(ReGenRAGError):
+    """No LLM provider is configured, or its configuration is invalid."""
+
+
+class LLMError(ReGenRAGError):
+    """An LLM provider call failed (network, HTTP, or malformed response)."""
