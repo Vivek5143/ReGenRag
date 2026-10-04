@@ -10,6 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 from app.db.enums import DocumentStatus, SessionStatus
+from app.retrieval.failure_classifier import RetrievalFailureCategory
 
 
 class HealthResponse(BaseModel):
@@ -84,8 +85,63 @@ class QuerySource(BaseModel):
     score: float | None
 
 
+class QueryRetrievalGrading(BaseModel):
+    """Summary of how the retrieved evidence was graded.
+
+    ``sufficient`` is True when at least one retrieved chunk met the similarity
+    threshold; ``relevant_count``/``low_relevance_count`` break down the
+    retrieved chunks. ``best_score`` and ``average_score`` are cosine
+    similarities over all retrieved chunks (None when nothing was retrieved).
+    """
+
+    sufficient: bool
+    threshold: float
+    relevant_count: int
+    low_relevance_count: int
+    best_score: float | None
+    average_score: float | None
+    reason: str
+
+
+class ChunkRelevanceResponse(BaseModel):
+    """LLM relevance judgement for one retrieved chunk.
+
+    ``relevant`` is the LLM's verdict on whether the chunk can help answer the
+    question; ``reason`` is its one-sentence explanation. ``parse_failed``
+    marks a verdict the grader could not parse (treated as not relevant).
+    """
+
+    chunk_id: uuid.UUID
+    relevant: bool
+    reason: str | None = None
+    parse_failed: bool = False
+
+
+class LlmRetrievalGradingResponse(BaseModel):
+    """Aggregate LLM-based relevance grading for a query response.
+
+    ``has_relevant_evidence`` is True when at least one chunk was judged
+    semantically relevant by the LLM. This is informational; the similarity
+    grader's sufficiency decision is unchanged.
+    """
+
+    relevant_count: int
+    failed_count: int
+    has_relevant_evidence: bool
+    reason: str
+    judgements: list[ChunkRelevanceResponse]
+
+
 class QueryResponse(BaseModel):
-    """Result of a RAG query: the generated answer plus its sources."""
+    """Result of a RAG query: the generated answer plus its sources.
+
+    ``retrieval_grading`` and ``llm_relevance`` are additive and informational;
+    they report on retrieval quality and do not change the answer behavior.
+    """
 
     answer: str
     sources: list[QuerySource]
+    retrieval_grading: QueryRetrievalGrading | None = None
+    llm_relevance: LlmRetrievalGradingResponse | None = None
+    failure_category: RetrievalFailureCategory | None = None
+    rewritten_query: str | None = None

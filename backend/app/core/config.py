@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 60
     max_retries: int = 3
     rag_top_k: int = 5
+    # Minimum cosine similarity for a retrieved chunk to count as relevant
+    # evidence. Scores are cosine similarity (1 - cosine distance), so higher
+    # is more relevant. Must be in [0, 1].
+    retrieval_similarity_threshold: float = 0.65
 
     @property
     def max_upload_bytes(self) -> int:
@@ -106,6 +110,15 @@ class Settings(BaseSettings):
         if not (0 <= self.chunk_overlap < self.chunk_size):
             raise ValueError(
                 "CHUNK_OVERLAP must be >= 0 and strictly smaller than CHUNK_SIZE"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_retrieval_threshold(self) -> "Settings":
+        """Guard against an out-of-range similarity threshold."""
+        if not (0.0 <= self.retrieval_similarity_threshold <= 1.0):
+            raise ValueError(
+                "RETRIEVAL_SIMILARITY_THRESHOLD must be between 0 and 1"
             )
         return self
 

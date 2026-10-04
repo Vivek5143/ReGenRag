@@ -18,6 +18,10 @@ from app.db.models.document_chunk import DocumentChunk
 from app.generation import llm as llm_module
 from app.services import rag_service
 
+# NOTE: Phase 4 insufficient-evidence gating uses deterministic
+# similarity scores from pgvector. For these API tests we patch the
+# retriever embedding so cosine similarity is finite and predictable.
+
 DIM = 384
 
 
@@ -81,9 +85,17 @@ def _seed_processed_document(db_session, session_id):
     return doc
 
 
-def test_query_successful(client, db_session):
+def test_query_successful(client, db_session, monkeypatch):
     session_id = _session_id(client)
     _seed_processed_document(db_session, session_id)
+
+    # Ensure deterministic, non-zero query embeddings so pgvector cosine
+    # similarity is finite and the Phase 4 similarity sufficiency gate passes.
+    monkeypatch.setattr(
+        rag_service.retriever,
+        "embed_query",
+        lambda q: _vec(1.0),
+    )
 
     response = client.post(
         f"/api/v1/sessions/{session_id}/query",
@@ -156,6 +168,12 @@ def test_query_no_retrieved_chunks_is_graceful(client, db_session, monkeypatch):
     assert body["sources"] == []
     assert isinstance(body["answer"], str) and body["answer"]
 
+    # Phase 4: the API exposes failure_category on the no-results path.
+    assert body["failure_category"] == "NO_RESULTS"
+    assert body["rewritten_query"] is None
+    assert body["retrieval_grading"] is not None
+    assert body["retrieval_grading"]["sufficient"] is False
+
 
 def test_query_llm_failure_returns_502(client, db_session, monkeypatch):
     session_id = _session_id(client)
@@ -182,3 +200,40 @@ def test_query_llm_not_configured_returns_503(client, db_session, monkeypatch):
     )
 
     assert response.status_code == 503
+
+
+def test_query_response_includes_rewritten_query(client, db_session, monkeypatch):
+    """The API exposes rewritten_query, mapped from RagAnswer.rewritten_query."""
+
+    session_id = _session_id(client)
+    _seed_processed_document(db_session, session_id)
+
+    # Deterministic embedding so the initial retrieval succeeds and generates.
+    monkeypatch.setattr(
+        rag_service.retriever, "embed_query", lambda q: _vec(1.0)
+    )
+
+    captured = {}
+
+    def fake_answer_question(db, sid, question):
+        captured["called"] = True
+        return rag_service.RagAnswer(
+            answer="ok",
+            sources=[],
+            rewritten_query="rewritten version of the question",
+        )
+
+    monkeypatch.setattr(
+        rag_service, "answer_question", fake_answer_question
+    )
+
+    response = client.post(
+        f"/api/v1/sessions/{session_id}/query",
+        json={"question": "What is this?"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert captured.get("called") is True
+    assert "rewritten_query" in body
+    assert body["rewritten_query"] == "rewritten version of the question"

@@ -1,1 +1,1 @@
-"""Retrieval layer: pgvector similarity search + LLM context building."""
+"""Retrieval layer: pgvector similarity search + retrieval grading + LLM context building."""

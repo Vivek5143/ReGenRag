@@ -5,7 +5,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session as DbSession
 
-from app.api.schemas import QueryRequest, QueryResponse, QuerySource
+from app.api.schemas import (
+    ChunkRelevanceResponse,
+    LlmRetrievalGradingResponse,
+    QueryRequest,
+    QueryResponse,
+    QueryRetrievalGrading,
+    QuerySource,
+)
 from app.core.exceptions import (
     LLMConfigError,
     LLMError,
@@ -57,6 +64,8 @@ def query_session(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
 
+    grading = result.retrieval_grading
+    relevance = result.llm_relevance
     return QueryResponse(
         answer=result.answer,
         sources=[
@@ -69,4 +78,38 @@ def query_session(
             )
             for source in result.sources
         ],
+        retrieval_grading=(
+            QueryRetrievalGrading(
+                sufficient=grading.sufficient,
+                threshold=grading.threshold,
+                relevant_count=len(grading.relevant_chunks),
+                low_relevance_count=len(grading.low_relevance_chunks),
+                best_score=grading.best_score,
+                average_score=grading.average_score,
+                reason=grading.reason,
+            )
+            if grading is not None
+            else None
+        ),
+        failure_category=result.failure_category,
+        rewritten_query=result.rewritten_query,
+        llm_relevance=(
+            LlmRetrievalGradingResponse(
+                relevant_count=relevance.relevant_count,
+                failed_count=relevance.failed_count,
+                has_relevant_evidence=relevance.has_relevant_evidence,
+                reason=relevance.reason,
+                judgements=[
+                    ChunkRelevanceResponse(
+                        chunk_id=judgement.chunk_id,
+                        relevant=judgement.relevant,
+                        reason=judgement.reason,
+                        parse_failed=judgement.parse_failed,
+                    )
+                    for judgement in relevance.judgements
+                ],
+            )
+            if relevance is not None
+            else None
+        ),
     )
