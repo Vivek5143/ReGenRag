@@ -71,6 +71,20 @@ def rewrite_query(
     if not rewritten:
         return None
 
+    # First, try to extract JSON from markdown code fences if present.
+    # Models often wrap JSON in ```json ... ``` or ``` ... ```.
+    if rewritten.startswith("```"):
+        # Find the first ``` and the last ```
+        first_fence = rewritten.find("```")
+        second_fence = rewritten.find("```", first_fence + 3)
+        if second_fence > first_fence:
+            # Extract content between fences
+            inner = rewritten[first_fence + 3 : second_fence].strip()
+            # Remove language hint if present (e.g., "json\n")
+            if inner.startswith("json"):
+                inner = inner[4:].strip()
+            rewritten = inner
+
     # Optional: if the model returned JSON, attempt to extract the string.
     # We intentionally keep this simple and robust.
     if rewritten.startswith("{") and "rewritten_query" in rewritten:

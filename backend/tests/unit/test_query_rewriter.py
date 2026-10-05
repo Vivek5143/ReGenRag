@@ -112,3 +112,67 @@ def test_query_rewrite_returns_none_on_llm_error():
     )
 
     assert rewritten is None
+
+
+def test_query_rewrite_handles_json_in_markdown_code_fences():
+    """Test that JSON wrapped in ```json ... ``` is properly extracted."""
+    chunks = [_chunk(0.1)]
+    retrieval_grading = similarity_grader.grade_retrieval(chunks, threshold=0.65)
+
+    # LLM returns JSON wrapped in markdown code fences (common behavior)
+    json_with_fences = """```json
+{"rewritten_query": "Find sections about quarterly revenue performance and outlook"}
+```"""
+
+    fake_llm = FakeLLMClient(response=json_with_fences)
+
+    rewritten = rewrite_query(
+        "What does the report say?",
+        chunks=chunks,
+        retrieval_grading=retrieval_grading,
+        llm_relevance=_llm_relevance(has_relevant_evidence=False),
+        client=fake_llm,
+    )
+
+    assert rewritten == "Find sections about quarterly revenue performance and outlook"
+    assert not rewritten.startswith("```")
+
+
+def test_query_rewrite_handles_json_without_code_fences():
+    """Test that bare JSON still works."""
+    chunks = [_chunk(0.1)]
+    retrieval_grading = similarity_grader.grade_retrieval(chunks, threshold=0.65)
+
+    bare_json = '{"rewritten_query": "Find sections about quarterly revenue performance and outlook"}'
+
+    fake_llm = FakeLLMClient(response=bare_json)
+
+    rewritten = rewrite_query(
+        "What does the report say?",
+        chunks=chunks,
+        retrieval_grading=retrieval_grading,
+        llm_relevance=_llm_relevance(has_relevant_evidence=False),
+        client=fake_llm,
+    )
+
+    assert rewritten == "Find sections about quarterly revenue performance and outlook"
+
+
+def test_query_rewrite_handles_plain_text_response():
+    """Test that plain text responses (non-JSON) are returned as-is."""
+    chunks = [_chunk(0.1)]
+    retrieval_grading = similarity_grader.grade_retrieval(chunks, threshold=0.65)
+
+    plain_text = "What are the key financial metrics?"
+
+    fake_llm = FakeLLMClient(response=plain_text)
+
+    rewritten = rewrite_query(
+        "What does the report say?",
+        chunks=chunks,
+        retrieval_grading=retrieval_grading,
+        llm_relevance=_llm_relevance(has_relevant_evidence=False),
+        client=fake_llm,
+    )
+
+    assert rewritten == plain_text

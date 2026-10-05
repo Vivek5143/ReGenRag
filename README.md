@@ -2,11 +2,11 @@
 
 **Self-healing Retrieval-Augmented Generation for reliable, evidence-grounded document intelligence.**
 
-> **Current version: Project Foundation / Phase 0**
+> **Current version: Phase 6 — Self-Healing / Retry Loop**
 >
-> This repository currently establishes the **project foundation only**. The RAG
-> pipeline (PDF parsing, chunking, embeddings, vector search, LLM calls, the
-> LangGraph self-healing loop, and evaluation) has **not yet been implemented**.
+> The RAG pipeline (PDF parsing, chunking, embeddings, vector search, LLM calls,
+> grounded generation, retrieval grading, self-healing retry loop) is implemented
+> and verified. Phase 7 (Evaluation) is the next milestone.
 > See [Current project status](#current-project-status).
 
 ## What is ReGenRAG?
@@ -103,12 +103,14 @@ regenrag/
 | Phase | Scope |
 | ----- | ----- |
 | **Phase 0** | **Foundation** — app shell, config, DB foundation, health endpoint, placeholder modules, minimal UI, Docker. ✅ |
-| **Phase 1** | **Database & session infrastructure** — PostgreSQL, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, cleanup lifecycle, minimal UI. ✅ **← you are here** |
-| Phase 2 | Ingestion: PDF loading, chunking, embeddings, pgvector storage |
-| Phase 3 | Retrieval + generation: vector search, grounded answers, refusal |
-| Phase 4 | Self-healing loop: LangGraph workflow, rewriting, grading, criticism, retries |
-| Phase 5 | Evaluation: retrieval/answer metrics, offline evaluation harness |
-| Phase 6 | Full frontend: upload/list, chat, self-healing trace, sources/evidence |
+| **Phase 1** | **Database & session infrastructure** — PostgreSQL, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, cleanup lifecycle, minimal UI. ✅ |
+| **Phase 2** | **Ingestion: PDF loading, chunking, embeddings, pgvector storage** ✅ |
+| **Phase 3** | **Retrieval + generation: vector search, grounded answers, refusal** ✅ |
+| **Phase 4** | **Retrieval grading: similarity + LLM relevance, failure classification, query rewriting** ✅ |
+| **Phase 5** | **Answer generation + grounding critic: LLM-based faithfulness evaluation** ✅ |
+| **Phase 6** | **Self-healing / retry loop: bounded recovery from retrieval & grounding failures** ✅ |
+| Phase 7 | Evaluation: retrieval/answer metrics, offline evaluation harness |
+| Phase 8 | Full frontend: upload/list, chat, self-healing trace, sources/evidence |
 
 ## Local setup
 
@@ -180,14 +182,20 @@ docker compose up --build
 ## Current project status
 
 - **Phase 1 — Database & temporary document session infrastructure.** ✅
-- The following are in place:
+- **Phase 2 — PDF ingestion & vectorization.** ✅
+- **Phase 3 — Retrieval + baseline RAG.** ✅
+- **Phase 4 — Retrieval grading.** ✅
+- **Phase 5 — Answer generation + grounding critic.** ✅
+- **Phase 6 — Self-healing / retry loop.** ✅
+
+The following are in place:
   - PostgreSQL connection via SQLAlchemy (pooled, lazy engine) and a
     `get_db` dependency.
   - ORM models: `Session`, `Document`, `DocumentChunk` with UUID ids, UTC
     timestamps, status enums, and cascading relationships
     (`Session 1─* Document 1─* DocumentChunk`).
   - A pgvector `embedding` column prepared on `document_chunks` (configurable
-    dimension via `EMBEDDING_DIMENSION`); **no embeddings are generated yet**.
+    dimension via `EMBEDDING_DIMENSION`); embeddings generated during ingestion.
   - Alembic migrations — initial revision `0001` creates the three tables and
     enables the `vector` extension.
   - Session lifecycle service: create / get / touch (rolling expiry) / close /
@@ -197,8 +205,19 @@ docker compose up --build
     path-traversal protection.
   - Cleanup service (idempotent) that removes documents, chunks, and uploaded
     files for expired/closed sessions. No scheduler yet — callable on demand.
-  - API endpoints for sessions and document upload under `/api/v1`, returning
-    structured Pydantic models that never expose internal storage paths.
+  - PDF ingestion pipeline: load → chunk → embed → store in pgvector.
+  - Vector retrieval with cosine similarity search and configurable top-k.
+  - Retrieval grading: deterministic similarity gating + LLM-based relevance grading.
+  - Failure classification: NO_RESULTS, LOW_SIMILARITY, LOW_LLM_RELEVANCE, INSUFFICIENT_EVIDENCE.
+  - Query rewriting for retrieval improvement.
+  - Answer generation with grounded prompts.
+  - Grounding evaluation (Phase 5): LLM judge scores answer faithfulness 0.0–1.0.
+  - Self-healing retry loop (Phase 6): bounded retries (configurable via `MAX_RAG_RETRIES`),
+    retrieval failure recovery via query rewrite + re-retrieve,
+    grounding failure recovery via context improvement + re-retrieve,
+    healing metadata in API response (healed, attempts, healing_steps, grounding_score, retry_exhausted).
+  - API endpoints for sessions, document upload, and query under `/api/v1`,
+    returning structured Pydantic models that never expose internal storage paths.
   - `GET /health` now reports database connectivity (200/`connected` or
     503/`disconnected`) without leaking credentials.
   - A minimal React + TypeScript + Vite page to start a session, upload PDFs,
@@ -206,10 +225,148 @@ docker compose up --build
   - A test suite that runs against an isolated PostgreSQL test database with
     **no** LLM keys, **no** embedding downloads, and **no** network access.
   - Docker Compose with frontend, backend, and a pgvector-ready PostgreSQL.
-- The **RAG pipeline is intentionally not implemented yet**: no PDF parsing,
-  no chunking, no embedding generation, no vector search, no LLM calls, no
-  LangGraph workflow, no query rewriting, no retrieval grading, no answer
-  criticism, no evaluation metrics.
+
+---
+
+## Phase 6 — Self-Healing / Retry Loop ✅
+
+Phase 6 implements a bounded self-healing RAG loop:
+
+```text
+User Query
+    ↓
+Retrieve
+    ↓
+Similarity Grading
+    ↓
+LLM Relevance Grading
+    ↓
+Sufficient Retrieval?
+    ├── Yes → Generate Answer
+    └── No  → Rewrite Query → Re-retrieve → Retry
+                                      ↓
+                              bounded by MAX_RAG_RETRIES
+```
+
+### Key Architectural Decisions
+
+- `MAX_RAG_RETRIES=2` (configurable via `MAX_RAG_RETRIES` in `.env`)
+- Maximum total attempts = 3 (initial + 2 retries)
+- **Similarity remains the hard retrieval acceptance gate.**
+- **LLM relevance is informational and cannot bypass the similarity gate.**
+- `NO_RESULTS` is handled as a controlled failure.
+- **No fallback answer generation** is allowed when retrieval remains insufficient.
+- The **original user question** is used for final answer generation.
+- Query rewriting is performed when retrieval is insufficient.
+- Re-retrieval uses the rewritten query.
+- Retry stops when retrieval succeeds, grounding succeeds, or the retry limit is exhausted.
+
+### Phase 6 Healing Actions
+
+| Action | Description |
+|--------|-------------|
+| `QUERY_REWRITE` | Retrieval was insufficient; rewrite the query for better retrieval |
+| `RE_RETRIEVE` | Execute retrieval again using the rewritten query |
+| `CONTEXT_IMPROVEMENT` | Grounding failed; improve retrieval context via query rewrite |
+| `ANSWER_REGENERATE` | Answer was generated but failed grounding evaluation |
+| `RETRY_EXHAUSTED` | Maximum retries reached without recovery |
+
+### Retrieval Gate Verification
+
+The retrieval gate was manually verified. Important verified behavior:
+
+```text
+Similarity PASS → generation allowed
+Similarity FAIL → healing triggered
+LLM relevance PASS alone → cannot bypass similarity gate
+Max retries reached → no fallback generation
+```
+
+### Query Rewriter Fix
+
+During manual verification, a bug was discovered and fixed in Phase 6:
+
+- **Problem:** LLM query rewrites could be returned as JSON wrapped inside Markdown code fences (`````json ... `````).
+- **Impact:** The parser previously passed the entire code-fence wrapper into retrieval instead of the extracted query string.
+- **Fix:** The parser in `query_rewriter.py` was updated to detect and extract JSON from Markdown code fences, then use only the `rewritten_query` field.
+- **Regression tests added for:**
+  - JSON inside Markdown code fences
+  - Bare JSON (no fences)
+  - Plain-text responses
+
+### Tests
+
+Latest verified results:
+
+```text
+Phase 6 RAG Service Tests: 23/23 passed
+Query Rewriter Tests:       6/6 passed
+Retriever Tests:            9/9 passed
+Full Test Suite:          256 passed, 4 failed
+```
+
+**The 4 full-suite failures are pre-existing baseline failures** and were unchanged by Phase 6:
+
+- `test_returns_llm_response_unchanged`
+- `test_chunks_and_embeddings_persisted`
+- `test_existing_providers_still_selected`
+- `test_gemini_non_2xx_surfaces_sanitized_google_error`
+
+### Real End-to-End Manual Verification
+
+A successful manual recovery test was performed using `ARATI_DHURI.pdf`.
+
+**Test query:**
+```text
+Tell me about the professional summary
+```
+
+**Observed recovery:**
+
+```text
+Attempt 0
+Similarity: FAIL (0/3)
+LLM relevance: 1/3
+        ↓
+Query Rewrite
+
+Attempt 1
+Similarity: FAIL (0/3)
+LLM relevance: 1/3
+        ↓
+Query Rewrite
+
+Attempt 2
+Similarity: PASS (1/3)
+LLM relevance: PASS (3/3)
+        ↓
+Answer generated successfully
+```
+
+**Final rewritten query:**
+```text
+Arati Dhuri Billing and Purchase Executive professional summary experience skills
+```
+
+The API successfully generated the final answer after retrieval recovery, demonstrating that Phase 6 was not only unit-tested but also manually verified through the real PDF → retrieval → grading → rewrite → re-retrieval → generation pipeline.
+
+---
+
+## Development roadmap
+
+| Phase | Scope |
+| ----- | ----- |
+| **Phase 0** | **Foundation** — app shell, config, DB foundation, health endpoint, placeholder modules, minimal UI, Docker. ✅ |
+| **Phase 1** | **Database & session infrastructure** — PostgreSQL, ORM models (sessions/documents/chunks), Alembic migrations, pgvector schema, upload API, cleanup lifecycle, minimal UI. ✅ |
+| **Phase 2** | **Ingestion: PDF loading, chunking, embeddings, pgvector storage** ✅ |
+| **Phase 3** | **Retrieval + generation: vector search, grounded answers, refusal** ✅ |
+| **Phase 4** | **Retrieval grading: similarity + LLM relevance, failure classification, query rewriting** ✅ |
+| **Phase 5** | **Answer generation + grounding critic: LLM-based faithfulness evaluation** ✅ |
+| **Phase 6** | **Self-healing / retry loop: bounded recovery from retrieval & grounding failures** ✅ |
+| Phase 7 | Evaluation: retrieval/answer metrics, offline evaluation harness |
+| Phase 8 | Full frontend: upload/list, chat, self-healing trace, sources/evidence |
+
+---
 
 ## License
 

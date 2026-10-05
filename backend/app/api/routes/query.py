@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.api.schemas import (
     ChunkRelevanceResponse,
+    HealingStepResponse,
     LlmRetrievalGradingResponse,
     QueryRequest,
     QueryResponse,
@@ -112,4 +113,17 @@ def query_session(
             if relevance is not None
             else None
         ),
+        healed=result.healed,
+        attempts=result.attempts,
+        healing_steps=[
+            HealingStepResponse(
+                attempt=step.attempt,
+                action=step.action,
+                failure_category=step.failure_category,
+                details=step.details,
+            )
+            for step in result.healing_steps
+        ],
+        grounding_score=result.grounding_score,
+        retry_exhausted=result.retry_exhausted,
     )

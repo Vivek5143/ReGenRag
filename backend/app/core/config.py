@@ -87,6 +87,12 @@ class Settings(BaseSettings):
     # evidence. Scores are cosine similarity (1 - cosine distance), so higher
     # is more relevant. Must be in [0, 1].
     retrieval_similarity_threshold: float = 0.65
+    # Maximum self-healing retries for the RAG pipeline (Phase 6).
+    # 0 = no retries (single attempt). 2 = initial + 2 retries = 3 total attempts.
+    max_rag_retries: int = 2
+    # Minimum grounding score [0, 1] for an answer to be considered grounded.
+    # Phase 5 grounding evaluator produces scores in this range.
+    grounding_threshold: float = 0.7
 
     @property
     def max_upload_bytes(self) -> int:

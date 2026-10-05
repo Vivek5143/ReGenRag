@@ -6,11 +6,13 @@ Response models are built explicitly from ORM objects so internal fields
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
 from app.db.enums import DocumentStatus, SessionStatus
 from app.retrieval.failure_classifier import RetrievalFailureCategory
+from app.services.rag_service import HealingAction
 
 
 class HealthResponse(BaseModel):
@@ -132,11 +134,27 @@ class LlmRetrievalGradingResponse(BaseModel):
     judgements: list[ChunkRelevanceResponse]
 
 
+class HealingStepResponse(BaseModel):
+    """Record of one healing action taken during the self-healing loop."""
+
+    attempt: int
+    action: HealingAction
+    failure_category: RetrievalFailureCategory | None = None
+    details: str = ""
+
+
 class QueryResponse(BaseModel):
     """Result of a RAG query: the generated answer plus its sources.
 
     ``retrieval_grading`` and ``llm_relevance`` are additive and informational;
     they report on retrieval quality and do not change the answer behavior.
+
+    Phase 6 adds self-healing metadata:
+    - ``healed``: True when recovery succeeded after an initial failure.
+    - ``attempts``: Total attempts made (initial + retries).
+    - ``healing_steps``: List of healing actions taken.
+    - ``grounding_score``: Phase 5 grounding evaluation score [0, 1].
+    - ``retry_exhausted``: True when all retries were used without success.
     """
 
     answer: str
@@ -145,3 +163,8 @@ class QueryResponse(BaseModel):
     llm_relevance: LlmRetrievalGradingResponse | None = None
     failure_category: RetrievalFailureCategory | None = None
     rewritten_query: str | None = None
+    healed: bool = False
+    attempts: int = 1
+    healing_steps: list[HealingStepResponse] = []
+    grounding_score: float | None = None
+    retry_exhausted: bool = False
