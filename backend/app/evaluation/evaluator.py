@@ -24,14 +24,14 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from app.core.logging import get_logger
-from app.evaluation.correctness import CorrectnessResult, grade_correctness
-from app.evaluation.grounding import GroundingResult, grade_grounding
-from app.evaluation.metrics import compute_retrieval_metrics
-from app.evaluation.model import EvalCase
-from app.evaluation.result import EvalResult, EvalRunResult
-from app.generation import llm
-from app.retrieval.vector_store import RetrievedChunk
+from ..core.logging import get_logger
+from .correctness import CorrectnessResult, grade_correctness
+from .grounding import GroundingResult, grade_grounding
+from .metrics import compute_retrieval_metrics
+from .model import EvalCase
+from .result import EvalResult, EvalRunResult
+from ..generation import llm
+from ..retrieval.vector_store import RetrievedChunk
 
 logger = get_logger(__name__)
 

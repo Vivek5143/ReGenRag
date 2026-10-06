@@ -2,11 +2,11 @@
 
 **Self-healing Retrieval-Augmented Generation for reliable, evidence-grounded document intelligence.**
 
-> **Current version: Phase 6 — Self-Healing / Retry Loop**
+> **Current version: Phase 7 — Evaluation**
 >
 > The RAG pipeline (PDF parsing, chunking, embeddings, vector search, LLM calls,
-> grounded generation, retrieval grading, self-healing retry loop) is implemented
-> and verified. Phase 7 (Evaluation) is the next milestone.
+> grounded generation, retrieval grading, self-healing retry loop, evaluation) is implemented
+> and verified. Phase 8 (UI + Production Hardening) is the next milestone.
 > See [Current project status](#current-project-status).
 
 ## What is ReGenRAG?
@@ -74,11 +74,11 @@ regenrag/
 │   │   ├── api/routes/     # HTTP endpoints (health)
 │   │   ├── core/           # environment-driven settings
 │   │   ├── db/             # SQLAlchemy engine + Session model
-│   │   ├── ingestion/      # [placeholder] load/chunk/embed
-│   │   ├── retrieval/      # [placeholder] vector store/retriever
-│   │   ├── generation/     # [placeholder] grounded answers
+│   │   ├── ingestion/      # load/chunk/embed
+│   │   ├── retrieval/      # vector store/retriever
+│   │   ├── generation/     # grounded answers
 │   │   ├── graph/          # [placeholder] LangGraph state/nodes/workflow
-│   │   ├── evaluation/     # [placeholder] metrics/evaluator
+│   │   ├── evaluation/     # metrics/evaluator
 │   │   └── services/       # session lifecycle service
 │   ├── tests/              # pytest suite (unit + integration)
 │   ├── alembic/            # migration tooling (adopted later)
@@ -109,7 +109,7 @@ regenrag/
 | **Phase 4** | **Retrieval grading: similarity + LLM relevance, failure classification, query rewriting** ✅ |
 | **Phase 5** | **Answer generation + grounding critic: LLM-based faithfulness evaluation** ✅ |
 | **Phase 6** | **Self-healing / retry loop: bounded recovery from retrieval & grounding failures** ✅ |
-| Phase 7 | Evaluation: retrieval/answer metrics, offline evaluation harness |
+| **Phase 7** | **Evaluation: retrieval/answer metrics, offline evaluation harness** ✅ |
 | Phase 8 | Full frontend: upload/list, chat, self-healing trace, sources/evidence |
 
 ## Local setup
@@ -187,6 +187,7 @@ docker compose up --build
 - **Phase 4 — Retrieval grading.** ✅
 - **Phase 5 — Answer generation + grounding critic.** ✅
 - **Phase 6 — Self-healing / retry loop.** ✅
+- **Phase 7 — Evaluation: retrieval/answer metrics, offline evaluation harness.** ✅
 
 The following are in place:
   - PostgreSQL connection via SQLAlchemy (pooled, lazy engine) and a
@@ -225,6 +226,171 @@ The following are in place:
   - A test suite that runs against an isolated PostgreSQL test database with
     **no** LLM keys, **no** embedding downloads, and **no** network access.
   - Docker Compose with frontend, backend, and a pgvector-ready PostgreSQL.
+  - **Evaluation harness (Phase 7)**: dataset loader, baseline runner, ReGenRAG runner,
+    metrics wrapper, comparator with recovery analysis, JSON/CSV report generation,
+    CLI entry point, and comprehensive unit tests.
+
+---
+
+## Phase 7 — Evaluation ✅
+
+Phase 7 implements a quantitative offline evaluation harness that compares the
+Baseline RAG (Phase 3) against ReGenRAG (Phase 6) on a labelled dataset.
+
+### Evaluation Architecture
+
+```
+Baseline RAG                           ReGenRAG
+─────────────                           ────────
+Query                                   Query
+  ↓                                       ↓
+Embed Query                            Embed Query
+  ↓                                       ↓
+Top-K Retrieval                        Retrieve
+  ↓                                       ↓
+Context                                Similarity Grading
+  ↓                                       ↓
+LLM                                     LLM Relevance Grading
+  ↓                                       ↓
+Answer                                 Sufficient?
+                                        ├─ Yes → Generate → Grounding Critic
+                                        └─ No  → Rewrite → Re-retrieve → Retry
+                                                   ↓
+                                           bounded by MAX_RAG_RETRIES
+```
+
+### Running Evaluation
+
+From the repository root:
+```bash
+python -m backend.app.evaluation.main --dataset data/evaluation/cases.json --out results/
+```
+
+From the backend directory:
+```bash
+cd backend
+python -m app.evaluation.main --dataset ../data/evaluation/cases.json --out ../results/
+```
+
+Generate a sample dataset:
+```bash
+python -m backend.app.evaluation.main --dataset data/evaluation/cases.json --out results/ --create-sample
+```
+
+### Output
+
+The evaluation produces two files in the output directory:
+
+```
+results/
+├── evaluation_report.json
+└── evaluation_report.csv
+```
+
+#### JSON Report Structure
+
+```json
+{
+  "run_metadata": {
+    "timestamp": "2026-10-06T15:14:00.669941Z",
+    "total_cases": 6,
+    "config": {
+      "rag_top_k": 5,
+      "max_rag_retries": 2,
+      "retrieval_similarity_threshold": 0.65,
+      "grounding_threshold": 0.7,
+      "embedding_model": "all-MiniLM-L6-v2",
+      "llm_provider": "gemini",
+      "llm_model": "gemini-3.5-flash-lite"
+    }
+  },
+  "aggregate_metrics": {
+    "total_cases": 6,
+    "baseline": {
+      "hit_rate": 0.5,
+      "mrr": 0.4,
+      "ndcg": 0.6,
+      "avg_grounding": 0.0,
+      "failure_rate": 0.3
+    },
+    "regenrag": {
+      "hit_rate": 0.8,
+      "mrr": 0.7,
+      "ndcg": 0.75,
+      "avg_grounding": 0.85,
+      "failure_rate": 0.1
+    },
+    "comparison": {
+      "improved_cases": 4,
+      "unchanged_cases": 1,
+      "regressed_cases": 1
+    }
+  },
+  "recovery_analysis": {
+    "requires_recovery_count": 2,
+    "successfully_recovered_count": 2,
+    "recovery_rate": 1.0,
+    "retry_rate": 0.33,
+    "query_rewrite_rate": 0.33,
+    "average_attempts": 1.33
+  },
+  "per_case_comparisons": [
+    {
+      "case_id": "case-001",
+      "query": "What is the main topic...",
+      "status": "Improved",
+      "baseline_hit_rate": 0.0,
+      "regen_hit_rate": 1.0,
+      "regen_rewritten": true,
+      "regen_attempts": 2,
+      ...
+    }
+  ]
+}
+```
+
+#### CSV Report
+
+The CSV contains one row per case with columns:
+- `case_id`, `query`, `status`
+- `baseline_hr`, `regen_hr`, `baseline_mrr`, `regen_mrr`, `baseline_ndcg`, `regen_ndcg`
+- `regen_rewritten`, `regen_attempts`, `regen_failure`
+
+### Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **Hit Rate@K** | Binary: 1 if at least one relevant chunk in top-K, else 0 |
+| **MRR** | Mean Reciprocal Rank: 1/r where r is rank of first relevant chunk |
+| **nDCG** | Normalized Discounted Cumulative Gain with binary relevance |
+| **Grounding** | LLM-based faithfulness score [0, 1] (ReGenRAG only) |
+| **Recovery Rate** | Cases recovered / cases requiring recovery |
+| **Retry Rate** | Percentage of cases requiring >1 attempt |
+| **Query Rewrite Rate** | Percentage of cases where query was rewritten |
+| **Average Attempts** | Mean total retrieval/generation attempts per query |
+
+### Offline Testing
+
+All unit tests use the existing fake/mock LLM and embedding fixtures. They do **not**
+require real Gemini, Ollama, or embedding services and run with no network access.
+
+```bash
+cd backend
+python -m pytest tests/evaluation -v
+```
+
+### Evaluation Dataset
+
+The evaluation dataset (`data/evaluation/cases.json`) contains cases across categories:
+- A: Successful retrieval
+- B: Partial retrieval
+- C: Complex multi-hop
+- D: Specific fact lookup
+- E: Irrelevant query (no relevant chunks)
+- F: Grounding failure / recovery case
+
+Each case specifies `relevant_chunk_ids` (oracle ground truth for retrieval metrics)
+and `expected_answer` (reference for correctness/grounding evaluation).
 
 ---
 
@@ -302,10 +468,10 @@ Latest verified results:
 Phase 6 RAG Service Tests: 23/23 passed
 Query Rewriter Tests:       6/6 passed
 Retriever Tests:            9/9 passed
-Full Test Suite:          256 passed, 4 failed
+Full Test Suite:          283 passed, 4 failed
 ```
 
-**The 4 full-suite failures are pre-existing baseline failures** and were unchanged by Phase 6:
+**The 4 full-suite failures are pre-existing baseline failures** and were unchanged by Phase 6 or 7:
 
 - `test_returns_llm_response_unchanged`
 - `test_chunks_and_embeddings_persisted`
@@ -363,7 +529,7 @@ The API successfully generated the final answer after retrieval recovery, demons
 | **Phase 4** | **Retrieval grading: similarity + LLM relevance, failure classification, query rewriting** ✅ |
 | **Phase 5** | **Answer generation + grounding critic: LLM-based faithfulness evaluation** ✅ |
 | **Phase 6** | **Self-healing / retry loop: bounded recovery from retrieval & grounding failures** ✅ |
-| Phase 7 | Evaluation: retrieval/answer metrics, offline evaluation harness |
+| **Phase 7** | **Evaluation: retrieval/answer metrics, offline evaluation harness** ✅ |
 | Phase 8 | Full frontend: upload/list, chat, self-healing trace, sources/evidence |
 
 ---

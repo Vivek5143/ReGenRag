@@ -27,8 +27,15 @@ data/uploads/*
 !data/uploads/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
+
+# Evaluation dataset
 data/evaluation/*
 !data/evaluation/.gitkeep
+!data/evaluation/cases.json
+
+# Evaluation / generated outputs
+results/
+graphify-out/
 
 # IDE / OS
 .vscode/

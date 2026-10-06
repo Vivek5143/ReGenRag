@@ -3,18 +3,25 @@
 See ``app.evaluation.model``, ``app.evaluation.metrics``,
 ``app.evaluation.result``, and ``app.evaluation.evaluator`` for the public API.
 """
-
-from app.evaluation.evaluator import AnswerEvaluator, evaluate_case, evaluate_run
-from app.evaluation.model import EvalCase
-from app.evaluation.metrics import (
+from .evaluator import (
+    AnswerEvaluator,
+    evaluate_case,
+    evaluate_run,
+)
+from .model import EvalCase
+from .metrics import (
     compute_retrieval_metrics,
     hit_rate,
     mean_reciprocal_rank,
     normalized_dcg,
 )
-from app.evaluation.grounding import GroundingResult, grade_grounding
-from app.evaluation.correctness import CorrectnessResult, grade_correctness
-from app.evaluation.result import EvalResult, EvalRunResult
+from .grounding import GroundingResult, grade_grounding
+from .correctness import CorrectnessResult, grade_correctness
+from .result import EvalResult, EvalRunResult
+from .baseline_runner import run_baseline
+from .regenrag_runner import run_regenrag
+from .dataset import load_cases, create_sample_dataset
+from .comparator import compare_runs, save_report, EvaluationReport
 
 __all__ = [
     # models
@@ -36,4 +43,14 @@ __all__ = [
     "AnswerEvaluator",
     "evaluate_case",
     "evaluate_run",
+    # Phase 7 runners
+    "run_baseline",
+    "run_regenrag",
+    # dataset
+    "load_cases",
+    "create_sample_dataset",
+    # comparator / report
+    "compare_runs",
+    "save_report",
+    "EvaluationReport",
 ]

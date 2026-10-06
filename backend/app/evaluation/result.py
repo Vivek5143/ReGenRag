@@ -8,6 +8,7 @@ collection is run, from per-case aggregates.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import List, Any
 
 from app.retrieval.failure_classifier import RetrievalFailureCategory
 
@@ -37,6 +38,10 @@ class EvalResult:
     # Human-authored expected answer, echoed back for audit (not used for
     # scoring here — answer_quality is kept as a future float placeholder).
     expected_answer: str | None = None
+    # Healing metadata (Phase 6)
+    attempts: int = 1
+    healing_steps: List[Any] = field(default_factory=list)
+    retry_exhausted: bool = False
 
     @property
     def retrieval_success(self) -> bool:
@@ -53,7 +58,7 @@ class EvalResult:
 class EvalRunResult:
     """Aggregated results across multiple :class:`EvalResult` cases."""
 
-    results: list[EvalResult] = field(default_factory=list)
+    results: List[EvalResult] = field(default_factory=list)
 
     @property
     def count(self) -> int:

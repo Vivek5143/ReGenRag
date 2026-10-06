@@ -1,0 +1,56 @@
+[
+  {
+    "id": "case-001",
+    "query": "What is the main topic of the uploaded documents?",
+    "expected_answer": "The documents discuss professional experience and skills in billing and purchase executive roles.",
+    "relevant_chunk_ids": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890", "b2c3d4e5-f6a7-8901-bcde-f23456789012"],
+    "category": "A",
+    "difficulty": "easy",
+    "metadata": {"source_doc": "ARATI_DHURI.pdf"}
+  },
+  {
+    "id": "case-002",
+    "query": "What specific skills are mentioned in the professional summary?",
+    "expected_answer": "Skills include billing, purchase order management, vendor coordination, and ERP systems.",
+    "relevant_chunk_ids": ["c3d4e5f6-a7b8-9012-cdef-345678901234"],
+    "category": "B",
+    "difficulty": "medium",
+    "metadata": {"source_doc": "ARATI_DHURI.pdf"}
+  },
+  {
+    "id": "case-003",
+    "query": "What is the capital of France?",
+    "expected_answer": "Paris",
+    "relevant_chunk_ids": [],
+    "category": "E",
+    "difficulty": "easy",
+    "metadata": {"type": "irrelevant_query"}
+  },
+  {
+    "id": "case-004",
+    "query": "Describe the work experience in chronological order.",
+    "expected_answer": "The candidate worked as a Billing Executive, then Purchase Executive, with increasing responsibilities.",
+    "relevant_chunk_ids": ["d4e5f6a7-b8c9-0123-defa-456789012345", "e5f6a7b8-c9d0-1234-efab-567890123456"],
+    "category": "C",
+    "difficulty": "hard",
+    "metadata": {"source_doc": "ARATI_DHURI.pdf"}
+  },
+  {
+    "id": "case-005",
+    "query": "What software tools are mentioned?",
+    "expected_answer": "SAP, Oracle, and Microsoft Excel are mentioned as tools used.",
+    "relevant_chunk_ids": ["f6a7b8c9-d0e1-2345-fabc-678901234567"],
+    "category": "D",
+    "difficulty": "medium",
+    "metadata": {"source_doc": "ARATI_DHURI.pdf"}
+  },
+  {
+    "id": "case-006",
+    "query": "Tell me about a project that failed due to budget constraints.",
+    "expected_answer": "No such project is mentioned in the documents.",
+    "relevant_chunk_ids": [],
+    "category": "F",
+    "difficulty": "hard",
+    "metadata": {"type": "grounding_failure_recovery"}
+  }
+]
