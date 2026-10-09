@@ -5,7 +5,16 @@
  * the frontend makes no direct external requests in development.
  */
 
-import type { HealthStatus, SessionInfo, UploadedDocument } from "../types/session";
+import type {
+  HealthStatus,
+  SessionInfo,
+  UploadedDocument,
+} from "../types/session";
+import type {
+  QueryRequest,
+  QueryResponse,
+  SystemStatus,
+} from "../types/query";
 
 const BASE = "/api/v1";
 
@@ -59,6 +68,49 @@ export async function uploadDocument(
   );
 }
 
+export async function querySession(
+  sessionId: string,
+  payload: QueryRequest,
+): Promise<QueryResponse> {
+  return handle(
+    await fetch(`${BASE}/sessions/${sessionId}/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
+
 export async function fetchHealth(): Promise<HealthStatus> {
   return handle(await fetch("/health"));
+}
+
+export async function fetchReady(): Promise<HealthStatus> {
+  return handle(await fetch("/ready"));
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatus> {
+  const [healthResponse, readyResponse] = await Promise.all([
+    fetch("/health"),
+    fetch("/ready"),
+  ]);
+
+  const [health, ready] = await Promise.all([
+    healthResponse.json(),
+    readyResponse.json(),
+  ]);
+
+  return {
+    health: {
+      status: health.status,
+      service: health.service,
+    },
+    ready: {
+      status: ready.status,
+      service: ready.service,
+      database: ready.database,
+    },
+  };
 }
