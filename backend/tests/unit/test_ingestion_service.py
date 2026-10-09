@@ -65,8 +65,8 @@ def test_chunks_and_embeddings_persisted(db_session, tmp_path, monkeypatch):
     for chunk in chunks:
         assert chunk.embedding is not None
         assert len(chunk.embedding) == 384
-        assert chunk.metadata["document_id"] == str(document.id)
-        assert chunk.metadata["filename"] == document.filename
+        assert chunk.meta["document_id"] == str(document.id)
+        assert chunk.meta["filename"] == document.filename
 
 
 def test_failure_marks_document_failed(db_session, tmp_path, monkeypatch):

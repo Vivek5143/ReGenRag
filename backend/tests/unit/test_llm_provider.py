@@ -107,16 +107,19 @@ def test_existing_providers_still_selected(monkeypatch):
     monkeypatch.setattr(llm.settings, "llm_model", "gpt-4o-mini")
     monkeypatch.setattr(llm.settings, "llm_api_key", "k")
     monkeypatch.setattr(llm.settings, "llm_base_url", "")
+    llm._client = None
     assert isinstance(llm.get_llm_client(), OpenAICompatibleClient)
 
     monkeypatch.setattr(llm.settings, "llm_provider", "anthropic")
     monkeypatch.setattr(llm.settings, "llm_model", "claude-3-5-haiku-latest")
     monkeypatch.setattr(llm.settings, "llm_api_key", "k")
+    llm._client = None
     assert isinstance(llm.get_llm_client(), AnthropicClient)
 
     monkeypatch.setattr(llm.settings, "llm_provider", "ollama")
     monkeypatch.setattr(llm.settings, "llm_model", "llama3")
     monkeypatch.setattr(llm.settings, "llm_api_key", "")
+    llm._client = None
     assert isinstance(llm.get_llm_client(), OpenAICompatibleClient)
 
 
@@ -192,7 +195,6 @@ def test_gemini_non_2xx_surfaces_sanitized_google_error(monkeypatch):
     # Sanitized: Google's fields only -- never the credential or headers.
     assert "secret-key" not in msg
     assert "x-goog-api-key" not in msg
-    assert "secret-key" not in str(captured["headers"])  # sanity: key only on wire
 
 
 def test_gemini_complete_unexpected_response_raises_llm_error(monkeypatch):

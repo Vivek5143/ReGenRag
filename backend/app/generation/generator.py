@@ -41,4 +41,4 @@ def generate_answer(
         raise LLMError("LLM returned an empty answer")
 
     logger.info("answer generated chars=%s", len(answer))
-    return answer
+    return answer.strip()
