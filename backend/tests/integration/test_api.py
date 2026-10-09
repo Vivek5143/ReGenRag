@@ -102,7 +102,7 @@ def test_upload_rejects_non_pdf(client):
     )
 
     assert response.status_code == 400
-    assert "PDF" in response.json()["detail"]
+    assert "PDF" in response.json()["error"]["detail"]
 
 
 def test_upload_rejects_oversized(client, monkeypatch):

@@ -94,6 +94,20 @@ class Settings(BaseSettings):
     # Phase 5 grounding evaluator produces scores in this range.
     grounding_threshold: float = 0.7
 
+    # --- CORS settings -------------------------------------------------------
+    # Backend CORS origins. Set to ["*"] for development, specific origins for production.
+    # Format: ["http://localhost:3000", "https://example.com"]
+    backend_cors_origins: list[str] = ["*"]
+
+    @model_validator(mode="after")
+    def _validate_cors_origins(self) -> "Settings":
+        """Ensure CORS origins is a list."""
+        if isinstance(self.backend_cors_origins, str):
+            # Handle comma-separated string from environment
+            origins = [origin.strip() for origin in self.backend_cors_origins.split(",")]
+            self.backend_cors_origins = origins
+        return self
+
     @property
     def max_upload_bytes(self) -> int:
         """Maximum upload size in bytes."""

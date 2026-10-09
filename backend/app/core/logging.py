@@ -5,6 +5,9 @@ contents, API keys, or database passwords.
 """
 
 import logging
+from typing import Any
+
+from fastapi import Request
 
 _FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 
@@ -19,3 +22,10 @@ def get_logger(name: str) -> logging.Logger:
         logger.setLevel(logging.INFO)
         logger.propagate = False
     return logger
+
+
+def get_request_id_from_state(request: Request | None) -> str | None:
+    """Safely extract request ID from request state."""
+    if request and hasattr(request.state, 'request_id'):
+        return request.state.request_id
+    return None

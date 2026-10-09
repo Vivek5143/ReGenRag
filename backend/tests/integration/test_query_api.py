@@ -131,7 +131,7 @@ def test_query_no_processed_document(client, db_session):
     )
 
     assert response.status_code == 404
-    assert "processed" in response.json()["detail"].lower()
+    assert "processed" in response.json()["error"]["detail"].lower()
 
 
 def test_query_empty_question_rejected(client):
@@ -142,6 +142,10 @@ def test_query_empty_question_rejected(client):
     )
 
     assert response.status_code == 422
+    error_data = response.json()
+    assert "error" in error_data
+    assert error_data["error"]["type"] == "RequestValidationError"
+    assert "question must not be empty" in error_data["error"]["message"]
 
 
 def test_query_blank_question_rejected(client):
@@ -152,6 +156,10 @@ def test_query_blank_question_rejected(client):
     )
 
     assert response.status_code == 422
+    error_data = response.json()
+    assert "error" in error_data
+    assert error_data["error"]["type"] == "RequestValidationError"
+    assert "question must not be empty" in error_data["error"]["message"]
 
 
 def test_query_no_retrieved_chunks_is_graceful(client, db_session, monkeypatch):

@@ -6,7 +6,7 @@ Response models are built explicitly from ORM objects so internal fields
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -141,6 +141,28 @@ class HealingStepResponse(BaseModel):
     action: HealingAction
     failure_category: RetrievalFailureCategory | None = None
     details: str = ""
+
+
+class ErrorDetail(BaseModel):
+    """Individual error detail for standardized error responses."""
+    type: str
+    message: str
+    detail: Optional[str] = None
+    request_id: Optional[str] = None
+    timestamp: float
+
+
+class APIErrorResponse(BaseModel):
+    """Standardized error response envelope for all API errors."""
+    error: ErrorDetail
+
+
+class APIMetadataResponse(BaseModel):
+    """API metadata/versioning information."""
+    name: str
+    version: str
+    description: Optional[str] = None
+    environment: str
 
 
 class QueryResponse(BaseModel):

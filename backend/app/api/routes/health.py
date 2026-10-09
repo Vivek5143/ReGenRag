@@ -1,7 +1,7 @@
-"""Health check endpoint.
+"""Health check endpoints: liveness and readiness.
 
-Reports liveness plus database connectivity. Never exposes connection strings,
-passwords, or internal details.
+/health  - liveness only (does not check database or external services)
+/ready   - readiness (checks database connectivity)
 """
 
 from fastapi import APIRouter
@@ -35,7 +35,25 @@ def _database_connected() -> bool:
 
 @router.get("/health", response_model=HealthResponse)
 def health():
-    """Return service liveness and database connectivity."""
+    """Liveness endpoint. Does NOT check database or external services.
+
+    Returns 200 if the process is alive.
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
+            "service": settings.app_name,
+        },
+    )
+
+
+@router.get("/ready", response_model=HealthResponse)
+def ready():
+    """Readiness endpoint. Checks database connectivity.
+
+    Returns 200 if ready to serve requests, 503 if database unavailable.
+    """
     if _database_connected():
         return JSONResponse(
             status_code=200,
