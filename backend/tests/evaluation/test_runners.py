@@ -80,7 +80,7 @@ def test_run_regenrag(mock_db, sample_case, monkeypatch):
     )
 
     # Mock rag_service.answer_question at the module where it's used
-    monkeypatch.setattr("app.evaluation.regenrag_runner.answer_question", lambda *args, **kwargs: mock_rag_answer)
+    monkeypatch.setattr("app.services.rag_service.answer_question", lambda *args, **kwargs: mock_rag_answer)
 
     result = run_regenrag(mock_db, sample_case)
 
@@ -118,7 +118,7 @@ def test_run_regenrag_with_recovery(mock_db, sample_case, monkeypatch):
         retry_exhausted=False
     )
 
-    monkeypatch.setattr("app.evaluation.regenrag_runner.answer_question", lambda *args, **kwargs: mock_rag_answer)
+    monkeypatch.setattr("app.services.rag_service.answer_question", lambda *args, **kwargs: mock_rag_answer)
 
     result = run_regenrag(mock_db, sample_case)
 

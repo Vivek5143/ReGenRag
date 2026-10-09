@@ -19,9 +19,11 @@ from .grounding import GroundingResult, grade_grounding
 from .correctness import CorrectnessResult, grade_correctness
 from .result import EvalResult, EvalRunResult
 from .baseline_runner import run_baseline
-from .regenrag_runner import run_regenrag
 from .dataset import load_cases, create_sample_dataset
 from .comparator import compare_runs, save_report, EvaluationReport
+
+# We avoid importing regenrag_runner at the top level to prevent circular imports.
+# It will be made available via __getattr__.
 
 __all__ = [
     # models
@@ -45,7 +47,7 @@ __all__ = [
     "evaluate_run",
     # Phase 7 runners
     "run_baseline",
-    "run_regenrag",
+    "run_regenrag",  # made available via __getattr__
     # dataset
     "load_cases",
     "create_sample_dataset",
@@ -54,3 +56,10 @@ __all__ = [
     "save_report",
     "EvaluationReport",
 ]
+
+
+def __getattr__(name):
+    if name == "run_regenrag":
+        from .regenrag_runner import run_regenrag
+        return run_regenrag
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

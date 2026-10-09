@@ -89,6 +89,8 @@ def run_regenrag(db: DbSession, case: EvalCase) -> EvalResult:
         A dataclass populated with retrieval metrics, grounding score, healing
         metadata, and the final answer.
     """
+    # Import inside function to avoid circular import
+    from ..services.rag_service import answer_question
     rag_answer = answer_question(
         db,
         session_id=uuid.UUID(case.id),
