@@ -32,10 +32,11 @@ from sqlalchemy.orm import Session as DbSession
 from app.core.config import settings
 from app.core.exceptions import NoProcessedDocumentError, RetrievalError
 from app.core.logging import get_logger
+from app.core.metrics import get_metrics, timer
 from app.db.enums import DocumentStatus
 from app.db.models.document import Document
-from app.evaluation import grounding
 from app.generation import generator
+from app.evaluation import grounding
 from app.retrieval import (
     context_builder,
     failure_classifier,
@@ -248,42 +249,74 @@ def answer_question(
         current_sources = _build_sources(retrieved_chunks)
 
         # --- Check Retrieval Sufficiency ---
-        if not retrieval_grading.sufficient:
-            # Classify the failure
-            if attempt == 0:
-                failure_category = failure_classifier.classify_initial_failure(
-                    chunks=retrieved_chunks,
-                    retrieval_grading=retrieval_grading,
-                    llm_relevance=llm_relevance,
-                )
-            else:
-                failure_category = failure_classifier.classify_retry_failure(
-                    chunks=retrieved_chunks,
-                    retrieval_grading=retrieval_grading,
-                    llm_relevance=llm_relevance,
-                )
+        # Hybrid sufficiency strategy:
+        # - Similarity grading provides the primary signal
+        # - LLM relevance can rescue similarity-insufficient retrieval when
+        #   meaningful relevant evidence is identified
+        # - NO_RESULTS is always a hard failure
+        #
+        # Decision order:
+        #   1. NO_RESULTS  → hard failure, no rewrite
+        #   2. Similarity sufficient → generate answer
+        #   3. LLM relevance has meaningful evidence → generate answer (rescued)
+        #   4. Otherwise → rewrite query, re-retrieve, retry
 
-            # Record the failure
+        # Classify the failure (used for NO_RESULTS check and healing metadata)
+        if attempt == 0:
+            failure_category = failure_classifier.classify_initial_failure(
+                chunks=retrieved_chunks,
+                retrieval_grading=retrieval_grading,
+                llm_relevance=llm_relevance,
+            )
+        else:
+            failure_category = failure_classifier.classify_retry_failure(
+                chunks=retrieved_chunks,
+                retrieval_grading=retrieval_grading,
+                llm_relevance=llm_relevance,
+            )
+
+        # --- 1. NO_RESULTS is a hard failure: nothing was retrieved at all.
+        # Rewriting against an empty result set cannot help, so skip rewriting
+        # and the second retrieval entirely: controlled insufficient-evidence
+        # response, no generation.
+        if failure_category is failure_classifier.RetrievalFailureCategory.NO_RESULTS:
+            # Persist metadata before breaking so the final response carries
+            # the correct classification instead of falling back to the
+            # default INSUFFICIENT_EVIDENCE at the bottom of the function.
             final_failure_category = failure_category
             final_retrieval_grading = retrieval_grading
             final_llm_relevance = llm_relevance
             final_sources = current_sources
+            healing_steps = _record_healing_step(
+                healing_steps,
+                attempt=attempt_count,
+                action=HealingAction.RETRY_EXHAUSTED,
+                failure_category=failure_category,
+                details="No results retrieved; query rewrite skipped",
+            )
+            retry_exhausted = True
+            break
 
-            # NO_RESULTS means nothing was retrieved at all. Rewriting a query against
-            # an empty result set cannot help, so skip rewriting and the second
-            # retrieval entirely: controlled insufficient-evidence response, no
-            # generation. Other insufficient categories proceed to rewrite + re-retrieve.
-            if failure_category is failure_classifier.RetrievalFailureCategory.NO_RESULTS:
-                healing_steps = _record_healing_step(
-                    healing_steps,
-                    attempt=attempt_count,
-                    action=HealingAction.RETRY_EXHAUSTED,
-                    failure_category=failure_category,
-                    details="No results retrieved; query rewrite skipped",
-                )
-                retry_exhausted = True
-                break
+        # --- 2. Similarity sufficient → generate answer
+        if retrieval_grading.sufficient:
+            pass  # proceed to answer generation below
 
+        # --- 3. LLM relevance can rescue similarity-insufficient retrieval
+        # when meaningful relevant evidence is identified. When rescued, leave
+        # the healing/retry branch immediately and proceed to answer generation.
+        elif llm_relevance.has_relevant_evidence:
+            failure_category = None  # retrieval rescued; treat as sufficient
+
+        # Record the failure metadata (preserved in final response)
+        # Note: final_failure_category is set AFTER rescue check so rescued
+        # retrievals get failure_category=None in the final response.
+        final_failure_category = failure_category
+        final_retrieval_grading = retrieval_grading
+        final_llm_relevance = llm_relevance
+        final_sources = current_sources
+
+        # --- 4. Neither similarity nor LLM relevance is sufficient → heal
+        if failure_category is not None:
             # If we've exhausted retries, stop
             if attempt >= max_retries:
                 healing_steps = _record_healing_step(

@@ -362,8 +362,8 @@ def test_first_insufficient_rewrite_second_insufficient_returns_controlled_answe
 
     def fake_grade_relevance(question, chunks, **_):
         llm_grade_calls["count"] += 1
-        if chunks == initial_chunks:
-            return _llm_grading(has_relevant_evidence=True)
+        # Both attempts have LLM relevance=False so that hybrid grading
+        # does NOT rescue the retrieval, preserving the original retry behavior.
         return _llm_grading(has_relevant_evidence=False)
 
     monkeypatch.setattr(rag_service.llm_grader, "grade_relevance", fake_grade_relevance)
@@ -1126,8 +1126,12 @@ def test_no_unnecessary_healing(db_session, monkeypatch):
 
 
 def test_healing_action_classification(db_session, monkeypatch):
-    """Test 8: Different failure categories result in expected healing actions."""
-    # Test LOW_SIMILARITY -> QUERY_REWRITE
+    """Test 8: Different failure categories result in expected healing actions.
+
+    With hybrid grading, similarity-fail + LLM-pass is a rescue path (no
+    healing). To exercise the healing branch, LLM relevance must also be
+    insufficient so the retrieval remains classified as LOW_SIMILARITY.
+    """
     session = _with_processed_document(db_session)
     original_question = "What is this?"
 
@@ -1150,10 +1154,12 @@ def test_healing_action_classification(db_session, monkeypatch):
 
     monkeypatch.setattr(rag_service.retriever, "retrieve", fake_retrieve)
 
+    # LLM relevance must be False on the first attempt so hybrid grading
+    # does NOT rescue the retrieval and healing proceeds.
     monkeypatch.setattr(
         rag_service.llm_grader,
         "grade_relevance",
-        lambda q, chunks, **_: _llm_grading(has_relevant_evidence=True),
+        lambda q, chunks, **_: _llm_grading(has_relevant_evidence=False),
     )
 
     monkeypatch.setattr(
@@ -1179,7 +1185,7 @@ def test_healing_action_classification(db_session, monkeypatch):
 
     result = rag_service.answer_question(db_session, session.id, original_question)
 
-    # LOW_SIMILARITY should trigger QUERY_REWRITE
+    # LOW_SIMILARITY with no LLM rescue should trigger QUERY_REWRITE
     actions = [step.action for step in result.healing_steps]
     assert rag_service.HealingAction.QUERY_REWRITE in actions
     assert rag_service.HealingAction.RE_RETRIEVE in actions
@@ -1253,33 +1259,30 @@ def test_retrieval_gate_similarity_only(db_session, monkeypatch):
 
 
 def test_retrieval_gate_similarity_fails_llm_relevance_passes(db_session, monkeypatch):
-    """Case 3: Similarity FAIL + LLM relevance PASS → Retrieval FAIL → Healing triggered.
+    """Case 3: Similarity FAIL + LLM relevance PASS → Retrieval RESCUED → No healing.
 
-    Even if LLM says chunks are relevant, if similarity gate fails, healing occurs.
+    With hybrid grading, LLM relevance can rescue similarity-insufficient retrieval
+    when meaningful relevant evidence is identified. The system proceeds directly
+    to answer generation without triggering query rewrite/retry.
+
+    This test verifies that similarity grading of sufficient=False with LLM
+    relevance having_relevant_evidence=True results in immediate retrieval
+    sufficiency and direct answer generation - no query rewrite or retry needed.
     """
     session = _with_processed_document(db_session)
     original_question = "What is this?"
 
-    # Low similarity chunks = similarity FAIL
+    # Single chunk with low similarity = similarity FAIL
     initial_chunks = [
         _fake_chunk(1, "low similarity content", 0, score=0.3),
     ]
-    # Second retrieval returns high similarity
-    second_chunks = [
-        _fake_chunk(2, "high similarity content", 0, score=0.9),
-    ]
-
-    retrieve_calls = {"count": 0}
 
     def fake_retrieve(db, session_id, question, top_k=None):
-        retrieve_calls["count"] += 1
-        if retrieve_calls["count"] == 1:
-            return initial_chunks
-        return second_chunks
+        return initial_chunks
 
     monkeypatch.setattr(rag_service.retriever, "retrieve", fake_retrieve)
 
-    # LLM relevance PASS for both attempts
+    # LLM relevance PASS with one relevant chunk
     monkeypatch.setattr(
         rag_service.llm_grader,
         "grade_relevance",
@@ -1310,12 +1313,19 @@ def test_retrieval_gate_similarity_fails_llm_relevance_passes(db_session, monkey
 
     result = rag_service.answer_question(db_session, session.id, original_question)
 
-    # Healing should trigger because similarity gate FAILED on first attempt
-    assert result.healed is True
-    assert result.attempts == 2
-    actions = [step.action for step in result.healing_steps]
-    assert rag_service.HealingAction.QUERY_REWRITE in actions
-    assert rag_service.HealingAction.RE_RETRIEVE in actions
+    # With hybrid grading, LLM relevance rescues the similarity failure.
+    # No healing should occur - we proceed directly to answer generation.
+    assert result.healed is False
+    assert result.attempts == 1
+    assert result.rewritten_query is None
+    assert len(result.healing_steps) == 0
+    assert result.grounding_score == 1.0
+    assert result.retry_exhausted is False
+    # The retrieval_grading object itself is unchanged; the rescue is reflected
+    # in failure_category=None and the decision to generate an answer.
+    assert result.retrieval_grading.sufficient is False
+    assert result.failure_category is None
+    assert result.llm_relevance.has_relevant_evidence is True
 
 
 def test_retrieval_gate_no_results_immediate_failure(db_session, monkeypatch):
